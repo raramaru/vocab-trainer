@@ -27,12 +27,11 @@ export default function App() {
   const [isFinished, setIsFinished] = useState(false);
   const [usedWordIds, setUsedWordIds] = useState<string[]>([]);
 
-  // 累計習得数
+  // 累計習得数と要特訓数
   const totalCorrectAchieved = useMemo(() => {
     return allWords.reduce((sum, w) => sum + (w.correctTotal || 0), 0);
   }, [allWords]);
 
-  // 要特訓数（間違いカウントが1以上の語数）
   const toTrainCount = useMemo(() => {
     return allWords.reduce((sum, w) => sum + (w.wrongCount > 0 ? 1 : 0), 0);
   }, [allWords]);
@@ -49,14 +48,15 @@ export default function App() {
     fetch('/systan_perfect_list.csv')
       .then(res => res.text())
       .then(csvData => {
-        const parsed = Papa.parse(csvData, { header: true }).data as any[];
+        // 型エラー回避のため <any> を指定してパース
+        const parsed = Papa.parse<any>(csvData, { header: true }).data;
         const savedData = localStorage.getItem('vocab-data');
         const savedList = savedData ? JSON.parse(savedData) : [];
         const savedMap = new Map(savedList.map((w: any) => [w.id, w]));
 
-        const formatted = parsed
-          .filter(w => w.English && w.Japanese)
-          .map(w => {
+        const formatted: Word[] = parsed
+          .filter((w: any) => w.English && w.Japanese)
+          .map((w: any) => {
             const saved = savedMap.get(w.ID);
             return {
               id: w.ID,
@@ -85,7 +85,6 @@ export default function App() {
       const sorted = [...availableWords].sort((a, b) => b.wrongCount - a.wrongCount);
       return sorted[0];
     } else {
-      // 通常モードは完全ランダム（確率変動なし）
       return availableWords[Math.floor(Math.random() * availableWords.length)];
     }
   };
@@ -155,8 +154,7 @@ export default function App() {
     }
   };
 
-  const isTrainingPhase = sessionType === 'training' && (currentWord !== null || isFinished);
-  const themeBg = isTrainingPhase ? 'bg-violet-950' : 'bg-slate-950';
+  const themeBg = (sessionType === 'training' && (currentWord || isFinished)) ? 'bg-violet-950' : 'bg-slate-950';
   const getBgModifier = () => {
     if (feedback === 'correct') return '!bg-green-950';
     if (feedback === 'wrong') return '!bg-red-950';
@@ -164,9 +162,10 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-500 text-white ${getBgModifier()}`} onClick={proceedNext}>
-      
-      {/* Settings Modal */}
+    <div 
+      className={`h-[100dvh] w-full flex flex-col items-center justify-center p-6 transition-all duration-500 text-white overflow-hidden fixed inset-0 ${getBgModifier()}`} 
+      onClick={proceedNext}
+    >
       {showSettings && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4" onClick={(e) => e.stopPropagation()}>
           <div className="bg-slate-900 p-8 rounded-3xl max-w-sm w-full space-y-4 border border-white/10 shadow-2xl">
@@ -194,19 +193,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Help Modal */}
       {showHelp && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-6" onClick={(e) => { e.stopPropagation(); setShowHelp(false); }}>
           <div className="bg-slate-900 p-8 rounded-3xl max-w-sm w-full space-y-6 border border-white/10 shadow-2xl text-left" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-black border-b border-white/10 pb-2 tracking-tighter uppercase">Information</h2>
             <div className="space-y-4 text-sm font-medium leading-relaxed text-white/70">
               <section>
-                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Total Mastery / To Train</h3>
-                <p>左側は習得した語数、右側の紫色は現在「一度でも間違えた」ため特訓が必要な語数です。</p>
+                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Mastery / To Train</h3>
+                <p>左は習得数、右の紫は「一度でも間違えた」語数です。正解を重ねて0になれば特訓リストから消えます。</p>
               </section>
               <section>
-                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Normal / Training</h3>
-                <p>通常モードは完全ランダム。トレーニングは要特訓語から間違いの多い順に出題します。</p>
+                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Modes</h3>
+                <p>通常は完全ランダム。トレーニングは要特訓リストから間違いの多い順に出題します。</p>
               </section>
             </div>
             <button onClick={() => setShowHelp(false)} className="w-full py-4 bg-white text-black rounded-2xl font-black uppercase">Close</button>
@@ -215,44 +213,47 @@ export default function App() {
       )}
 
       {isFinished ? (
-        <div className="text-center space-y-8" onClick={(e) => e.stopPropagation()}>
-          <h2 className="text-xl font-bold tracking-[0.3em] text-white/30 uppercase">Result</h2>
-          <div className="text-[10rem] font-black leading-none tracking-tighter tabular-nums">{Math.round((correctSession / (solvedCount || 1)) * 100)}<span className="text-4xl">%</span></div>
-          <p className="text-2xl font-medium text-white/70">{solvedCount}問中 {correctSession}問正解</p>
-          <button onClick={() => { setIsFinished(false); setSessionType('normal'); }} className="px-12 py-4 bg-white text-black rounded-full font-black shadow-lg active:scale-95 transition-all uppercase">Back to Lobby</button>
+        <div className="text-center space-y-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <h2 className="text-sm font-bold tracking-[0.3em] text-white/30 uppercase">Result</h2>
+          <div className="text-[7rem] sm:text-[10rem] font-black leading-none tracking-tighter tabular-nums">
+            {Math.round((correctSession / (solvedCount || 1)) * 100)}<span className="text-xl sm:text-2xl">%</span>
+          </div>
+          <p className="text-lg sm:text-xl font-medium text-white/70">{solvedCount}問中 {correctSession}問正解</p>
+          <button onClick={() => { setIsFinished(false); setSessionType('normal'); }} className="w-full py-4 bg-white text-black rounded-full font-black shadow-lg active:scale-90 transition-all uppercase">Back to Lobby</button>
         </div>
       ) : !currentWord ? (
-        <div className="text-center space-y-12 relative z-10" onClick={(e) => e.stopPropagation()}>
-          <div className="space-y-4">
-            <h1 className="text-8xl font-black tracking-tighter leading-none">VOCAB<br/>TRAINER</h1>
-            <div className="flex gap-2 justify-center">
-              <div className="px-6 py-2 rounded-2xl border border-white/10 bg-white/5">
-                <p className="text-[10px] font-black tracking-[0.3em] text-white/40 uppercase mb-1">Total Mastery</p>
+        <div className="text-center space-y-10 relative z-10 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-6">
+            <h1 className="text-6xl sm:text-8xl font-black tracking-tighter leading-none">VOCAB<br/>TRAINER</h1>
+            <div className="flex gap-3 justify-center">
+              <div className="flex-1 px-4 py-4 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm">
+                <p className="text-[10px] font-black tracking-[0.2em] text-white/40 uppercase mb-1">Mastery</p>
                 <p className="text-4xl font-black tabular-nums">{totalCorrectAchieved.toLocaleString()}</p>
               </div>
-              <div className="px-6 py-2 rounded-2xl border border-violet-500/20 bg-violet-500/10">
-                <p className="text-[10px] font-black tracking-[0.3em] text-violet-400/60 uppercase mb-1">To Train</p>
+              <div className="flex-1 px-4 py-4 rounded-3xl border border-violet-500/20 bg-violet-500/10 backdrop-blur-sm">
+                <p className="text-[10px] font-black tracking-[0.2em] text-violet-400/60 uppercase mb-1">To Train</p>
                 <p className="text-4xl font-black tabular-nums text-violet-400">{toTrainCount.toLocaleString()}</p>
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-4 items-center w-full max-w-xs mx-auto">
+          <div className="flex flex-col gap-4 items-center w-full px-6">
             <button onClick={() => startSession('normal')} className="w-full py-6 bg-white text-black rounded-full font-black text-2xl shadow-2xl active:scale-95 transition-all uppercase">Start</button>
-            <button onClick={() => hasWrongWords && startSession('training')} disabled={!hasWrongWords} className={`w-full py-5 rounded-full font-black text-xl shadow-xl transition-all uppercase border-none ${hasWrongWords ? 'bg-violet-600 text-white active:scale-95 hover:bg-violet-500 cursor-pointer' : 'bg-violet-900/30 text-white/20 cursor-not-allowed opacity-20'}`}>Training Mode</button>
-            {!hasWrongWords && <p className="text-[10px] font-bold tracking-widest text-violet-500/50 uppercase">No mistakes to train yet</p>}
-            <button onClick={() => setShowSettings(true)} className="mt-4 text-[10px] tracking-[0.3em] opacity-40 uppercase underline cursor-pointer hover:opacity-100 transition-opacity z-20">Settings</button>
+            <button onClick={() => hasWrongWords && startSession('training')} disabled={!hasWrongWords} className={`w-full py-5 rounded-full font-black text-xl shadow-xl transition-all uppercase border-none ${hasWrongWords ? 'bg-violet-600 text-white active:scale-95' : 'bg-violet-900/20 text-white/10 opacity-30 cursor-not-allowed'}`}>Training Mode</button>
+            <button onClick={() => setShowSettings(true)} className="mt-4 text-[10px] tracking-[0.3em] opacity-40 uppercase underline p-2 z-20 cursor-pointer">Settings</button>
           </div>
-          <button onClick={() => setShowHelp(true)} className="fixed bottom-8 right-8 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 font-black hover:bg-white/10 hover:text-white transition-all z-30">?</button>
+          <button onClick={() => setShowHelp(true)} className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 text-xl font-black z-30 active:scale-75 shadow-2xl">?</button>
         </div>
       ) : (
-        <div className="w-full max-w-xl space-y-12">
-          <div className="text-center">
-            <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase mb-4 ${sessionType === 'training' ? 'bg-violet-500 text-white' : 'bg-white/10 text-white/50'}`}>
-              {sessionType === 'training' ? 'Training Phase' : 'Normal Session'} {solvedCount + 1} / {sessionLimit}
+        <div className="w-full max-w-md flex flex-col items-center justify-between h-full py-12">
+          <div className="text-center px-4 w-full">
+            <div className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase mb-8 ${sessionType === 'training' ? 'bg-violet-500 text-white' : 'bg-white/10 text-white/50'}`}>
+              {sessionType === 'training' ? 'Training' : 'Normal'} {solvedCount + 1} / {sessionLimit}
             </div>
-            <h2 className="text-7xl font-black break-words tracking-tight leading-tight">{mode === 'enToJa' ? currentWord.english : currentWord.japanese}</h2>
+            <h2 className="text-6xl sm:text-7xl font-black break-words tracking-tight leading-tight min-h-[160px] flex items-center justify-center">
+              {mode === 'enToJa' ? currentWord.english : currentWord.japanese}
+            </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4 w-full px-6">
             {options.map((option, i) => {
               const isCorrect = option === (mode === 'enToJa' ? currentWord.japanese : currentWord.english);
               let variant = feedback === null ? 'normal' : feedback === 'correct' ? (isCorrect ? 'correct' : 'dim') : (isCorrect ? 'correct' : 'wrong');
@@ -260,9 +261,9 @@ export default function App() {
                 <button
                   key={i}
                   onClick={(e) => { if (!feedback) { e.stopPropagation(); handleAnswer(option); } }}
-                  className={`p-6 text-xl font-bold rounded-2xl border-2 transition-all text-center active:scale-[0.98]
-                    ${variant === 'normal' ? (sessionType === 'training' ? 'bg-violet-900/40 border-violet-800 hover:border-violet-400' : 'bg-slate-900 border-slate-800 hover:border-white') : ''}
-                    ${variant === 'correct' ? 'bg-green-500 border-green-500 shadow-[0_0_40px_rgba(34,197,94,0.4)] z-10 scale-105' : ''}
+                  className={`w-full p-6 text-xl font-bold rounded-2xl border-2 transition-all text-center active:scale-[0.97]
+                    ${variant === 'normal' ? (sessionType === 'training' ? 'bg-violet-900/40 border-violet-800' : 'bg-slate-900 border-slate-800') : ''}
+                    ${variant === 'correct' ? 'bg-green-500 border-green-500 shadow-xl z-10 scale-[1.03]' : ''}
                     ${variant === 'wrong' ? 'bg-red-500 border-red-500 opacity-20' : ''}
                     ${variant === 'dim' ? 'opacity-10 border-transparent' : ''}
                   `}
@@ -272,8 +273,8 @@ export default function App() {
               );
             })}
           </div>
-          <div className="h-16 flex items-center justify-center">
-            {feedback && <p className="text-xs font-black tracking-[0.4em] text-white/50 uppercase animate-pulse">Tap anywhere to continue</p>}
+          <div className="h-12 flex items-end justify-center">
+            {feedback && <p className="text-[10px] font-black tracking-[0.4em] text-white/30 uppercase animate-pulse">Tap anywhere to continue</p>}
           </div>
         </div>
       )}
