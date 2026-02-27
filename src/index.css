@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 画面の高さを動的に固定 */
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  /* スマホの引っ張り更新やスクロールを無効化 */
+  overscroll-behavior: none;
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
+  position: fixed; /* 画面を固定 */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#root {
+  height: 100dvh;
+  width: 100vw;
+}
