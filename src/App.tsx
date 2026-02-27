@@ -113,10 +113,14 @@ export default function App() {
     setFeedback(null);
   };
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswer = (answer: string | null) => {
     if (!currentWord || feedback || isFinished) return;
+    
+    // SKIPの場合は一律で間違い扱い
+    const isSkip = answer === null;
     const correctAnswer = mode === 'enToJa' ? currentWord.japanese : currentWord.english;
-    const isCorrect = answer === correctAnswer;
+    const isCorrect = !isSkip && answer === correctAnswer;
+    
     setFeedback(isCorrect ? 'correct' : 'wrong');
     if (isCorrect) setCorrectSession(prev => prev + 1);
     
@@ -267,7 +271,7 @@ export default function App() {
                 <div className="w-10 h-1 border-b-2 border-white/20"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 w-full">
+              <div className="grid grid-cols-1 gap-4 w-full relative">
                 {options.map((option, i) => {
                   const isCorrect = option === (mode === 'enToJa' ? currentWord.japanese : currentWord.english);
                   let variant = feedback === null ? 'normal' : feedback === 'correct' ? (isCorrect ? 'correct' : 'dim') : (isCorrect ? 'correct' : 'wrong');
@@ -286,6 +290,16 @@ export default function App() {
                     </button>
                   );
                 })}
+                
+                {/* SKIPボタン: 選択肢が表示されている間だけ、右下に控えめに表示 */}
+                {!feedback && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleAnswer(null); }}
+                    className="absolute -bottom-12 right-0 px-4 py-2 text-[10px] font-black tracking-[0.3em] text-white/20 uppercase hover:text-white/60 transition-colors"
+                  >
+                    Skip
+                  </button>
+                )}
               </div>
             )}
           </div>
