@@ -15,6 +15,7 @@ export default function App() {
   const [options, setOptions] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [sessionType, setSessionType] = useState<'normal' | 'training'>('normal');
+  const [showOptions, setShowOptions] = useState(false);
   
   const [mode, setMode] = useState<'enToJa' | 'jaToEn'>(() => (localStorage.getItem('conf-mode') as any) || 'enToJa');
   const [range, setRange] = useState(() => JSON.parse(localStorage.getItem('conf-range') || '{"start":1,"end":100}'));
@@ -27,7 +28,6 @@ export default function App() {
   const [isFinished, setIsFinished] = useState(false);
   const [usedWordIds, setUsedWordIds] = useState<string[]>([]);
 
-  // 累計習得数と要特訓数
   const totalCorrectAchieved = useMemo(() => {
     return allWords.reduce((sum, w) => sum + (w.correctTotal || 0), 0);
   }, [allWords]);
@@ -44,17 +44,13 @@ export default function App() {
     localStorage.setItem('conf-limit', sessionLimit.toString());
   }, [mode, range, sessionLimit]);
 
-useEffect(() => {
+  useEffect(() => {
     fetch('/systan_perfect_list.csv')
       .then(res => res.text())
       .then(csvData => {
-        // 1. まずは any[] としてパースを強行
         const parsed = Papa.parse(csvData, { header: true }).data as any[];
-        
         const savedData = localStorage.getItem('vocab-data');
         const savedList = savedData ? JSON.parse(savedData) : [];
-        
-        // 2. savedMap に入れる型を明確に定義して TS の不安を清算
         const savedMap = new Map<string, { wrongCount: number, correctTotal: number }>(
           savedList.map((w: any) => [w.id, { wrongCount: w.wrongCount, correctTotal: w.correctTotal }])
         );
@@ -67,7 +63,6 @@ useEffect(() => {
               id: w.ID,
               english: w.English,
               japanese: w.Japanese,
-              // 3. saved が存在する場合のみ値を取り出し、なければ 0
               wrongCount: saved ? saved.wrongCount : 0,
               correctTotal: saved ? saved.correctTotal : 0
             };
@@ -108,6 +103,7 @@ useEffect(() => {
   const setupQuestion = (word: Word) => {
     setCurrentWord(word);
     setUsedWordIds(prev => [...prev, word.id]);
+    setShowOptions(false);
     const correctAnswer = mode === 'enToJa' ? word.japanese : word.english;
     const wrongAnswers = allWords
       .filter(w => (mode === 'enToJa' ? w.japanese : w.english) !== correctAnswer)
@@ -154,7 +150,7 @@ useEffect(() => {
   };
 
   const handleReset = () => {
-    if (window.confirm("これまでの学習記録をすべて削除しますか？")) {
+    if (window.confirm("学習記録をすべてリセットしますか？")) {
       localStorage.removeItem('vocab-data');
       window.location.reload();
     }
@@ -206,7 +202,7 @@ useEffect(() => {
             <div className="space-y-4 text-sm font-medium leading-relaxed text-white/70">
               <section>
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Mastery / To Train</h3>
-                <p>左は習得数、右の紫は「一度でも間違えた」語数です。正解を重ねて0になれば特訓リストから消えます。</p>
+                <p>左は習得数、右の紫は「一度でも間違えた」語数です。正解を重ねて0になれば特訓リストから清算されます。</p>
               </section>
               <section>
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Modes</h3>
@@ -230,7 +226,7 @@ useEffect(() => {
       ) : !currentWord ? (
         <div className="text-center space-y-10 relative z-10 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
           <div className="space-y-6">
-            <h1 className="text-6xl sm:text-8xl font-black tracking-tighter leading-none">VOCAB<br/>TRAINER</h1>
+            <h1 className="text-6xl sm:text-8xl font-black tracking-tighter leading-none uppercase">Vocab<br/>Trainer</h1>
             <div className="flex gap-3 justify-center">
               <div className="flex-1 px-4 py-4 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-sm">
                 <p className="text-[10px] font-black tracking-[0.2em] text-white/40 uppercase mb-1">Mastery</p>
@@ -259,26 +255,41 @@ useEffect(() => {
               {mode === 'enToJa' ? currentWord.english : currentWord.japanese}
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 w-full px-6">
-            {options.map((option, i) => {
-              const isCorrect = option === (mode === 'enToJa' ? currentWord.japanese : currentWord.english);
-              let variant = feedback === null ? 'normal' : feedback === 'correct' ? (isCorrect ? 'correct' : 'dim') : (isCorrect ? 'correct' : 'wrong');
-              return (
-                <button
-                  key={i}
-                  onClick={(e) => { if (!feedback) { e.stopPropagation(); handleAnswer(option); } }}
-                  className={`w-full p-6 text-xl font-bold rounded-2xl border-2 transition-all text-center active:scale-[0.97]
-                    ${variant === 'normal' ? (sessionType === 'training' ? 'bg-violet-900/40 border-violet-800' : 'bg-slate-900 border-slate-800') : ''}
-                    ${variant === 'correct' ? 'bg-green-500 border-green-500 shadow-xl z-10 scale-[1.03]' : ''}
-                    ${variant === 'wrong' ? 'bg-red-500 border-red-500 opacity-20' : ''}
-                    ${variant === 'dim' ? 'opacity-10 border-transparent' : ''}
-                  `}
-                >
-                  {option}
-                </button>
-              );
-            })}
+
+          <div className="w-full px-6 min-h-[320px] flex flex-col justify-center">
+            {!showOptions ? (
+              <div 
+                onClick={(e) => { e.stopPropagation(); setShowOptions(true); }}
+                className="w-full py-16 border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center space-y-4 animate-pulse cursor-pointer hover:border-white/40 transition-colors"
+              >
+                <div className="w-10 h-1 border-t-2 border-white/20"></div>
+                <p className="text-[10px] font-black tracking-[0.4em] text-white/40 uppercase">Tap to reveal options</p>
+                <div className="w-10 h-1 border-b-2 border-white/20"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+                {options.map((option, i) => {
+                  const isCorrect = option === (mode === 'enToJa' ? currentWord.japanese : currentWord.english);
+                  let variant = feedback === null ? 'normal' : feedback === 'correct' ? (isCorrect ? 'correct' : 'dim') : (isCorrect ? 'correct' : 'wrong');
+                  return (
+                    <button
+                      key={i}
+                      onClick={(e) => { if (!feedback) { e.stopPropagation(); handleAnswer(option); } }}
+                      className={`w-full p-6 text-xl font-bold rounded-2xl border-2 transition-all text-center active:scale-[0.97]
+                        ${variant === 'normal' ? (sessionType === 'training' ? 'bg-violet-900/40 border-violet-800' : 'bg-slate-900 border-slate-800') : ''}
+                        ${variant === 'correct' ? 'bg-green-500 border-green-500 shadow-xl z-10 scale-[1.03]' : ''}
+                        ${variant === 'wrong' ? 'bg-red-500 border-red-500 opacity-20' : ''}
+                        ${variant === 'dim' ? 'opacity-10 border-transparent' : ''}
+                      `}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
+          
           <div className="h-12 flex items-end justify-center">
             {feedback && <p className="text-[10px] font-black tracking-[0.4em] text-white/30 uppercase animate-pulse">Tap anywhere to continue</p>}
           </div>
