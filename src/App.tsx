@@ -44,19 +44,20 @@ export default function App() {
     localStorage.setItem('conf-limit', sessionLimit.toString());
   }, [mode, range, sessionLimit]);
 
-  useEffect(() => {
+useEffect(() => {
     fetch('/systan_perfect_list.csv')
       .then(res => res.text())
       .then(csvData => {
-        // 型エラー回避のため <any> を指定してパース
-        const parsed = Papa.parse<any>(csvData, { header: true }).data;
+        // 【ここが最強の清算】 as any[] を付けて、TSの口を完全に封じます
+        const parsed = Papa.parse(csvData, { header: true }).data as any[];
+        
         const savedData = localStorage.getItem('vocab-data');
         const savedList = savedData ? JSON.parse(savedData) : [];
         const savedMap = new Map(savedList.map((w: any) => [w.id, w]));
 
         const formatted: Word[] = parsed
-          .filter((w: any) => w.English && w.Japanese)
-          .map((w: any) => {
+          .filter((w) => w && w.English && w.Japanese)
+          .map((w) => {
             const saved = savedMap.get(w.ID);
             return {
               id: w.ID,
