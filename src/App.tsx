@@ -260,14 +260,14 @@ export default function App() {
             {!showOptions ? (
               <div 
                 onClick={(e) => { e.stopPropagation(); setShowOptions(true); }}
-                className="w-full py-16 border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center space-y-4 animate-pulse cursor-pointer hover:border-white/40 transition-colors"
+                className="w-full py-16 border-2 border-dashed border-white/20 rounded-3xl flex flex-col items-center justify-center space-y-4 cursor-pointer hover:border-white/40 transition-colors"
               >
                 <div className="w-10 h-1 border-t-2 border-white/20"></div>
                 <p className="text-[10px] font-black tracking-[0.4em] text-white/40 uppercase">Tap to reveal options</p>
                 <div className="w-10 h-1 border-b-2 border-white/20"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="grid grid-cols-1 gap-4 w-full">
                 {options.map((option, i) => {
                   const isCorrect = option === (mode === 'enToJa' ? currentWord.japanese : currentWord.english);
                   let variant = feedback === null ? 'normal' : feedback === 'correct' ? (isCorrect ? 'correct' : 'dim') : (isCorrect ? 'correct' : 'wrong');
