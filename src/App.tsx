@@ -206,7 +206,7 @@ export default function App() {
             <div className="space-y-4 text-sm font-medium leading-relaxed text-white/70">
               <section>
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Mastery / To Train</h3>
-                <p>左は習得数、右の紫は「一度でも間違えた」語数です。正解を重ねて0になれば特訓リストから清算されます。</p>
+                <p>左は習得数、右の紫は間違えた語数です。間違えた単語を間違えた回数分だけ新たに正解すると、特訓リストから除外されます。</p>
               </section>
               <section>
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-1">Modes</h3>
