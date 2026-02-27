@@ -48,12 +48,16 @@ useEffect(() => {
     fetch('/systan_perfect_list.csv')
       .then(res => res.text())
       .then(csvData => {
-        // 【ここが最強の清算】 as any[] を付けて、TSの口を完全に封じます
+        // 1. まずは any[] としてパースを強行
         const parsed = Papa.parse(csvData, { header: true }).data as any[];
         
         const savedData = localStorage.getItem('vocab-data');
         const savedList = savedData ? JSON.parse(savedData) : [];
-        const savedMap = new Map(savedList.map((w: any) => [w.id, w]));
+        
+        // 2. savedMap に入れる型を明確に定義して TS の不安を清算
+        const savedMap = new Map<string, { wrongCount: number, correctTotal: number }>(
+          savedList.map((w: any) => [w.id, { wrongCount: w.wrongCount, correctTotal: w.correctTotal }])
+        );
 
         const formatted: Word[] = parsed
           .filter((w) => w && w.English && w.Japanese)
@@ -63,8 +67,9 @@ useEffect(() => {
               id: w.ID,
               english: w.English,
               japanese: w.Japanese,
+              // 3. saved が存在する場合のみ値を取り出し、なければ 0
               wrongCount: saved ? saved.wrongCount : 0,
-              correctTotal: saved ? saved.correctTotal || 0 : 0
+              correctTotal: saved ? saved.correctTotal : 0
             };
           });
         setAllWords(formatted);
